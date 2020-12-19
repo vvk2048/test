@@ -1,0 +1,133 @@
+from collections import Counter
+import pprint
+import numpy as np
+from tqdm import tqdm
+
+f = open(f"./train_processed.txt", "r")
+sentences = f.readlines()
+f.close()
+print(len(sentences))
+
+sentences = [sentence.rstrip() for sentence in sentences if len(sentence) > 2]
+sentences[27]
+
+word_tag_pairs = []
+for sentence in sentences:
+    for word_tag_pair in sentence.split(" "):
+        if len(word_tag_pair.strip()) != 0:
+            word_tag_pairs.append(word_tag_pair.strip())
+print(len(word_tag_pairs))
+print(word_tag_pairs[4])
+
+for pair in word_tag_pairs:
+    try:
+        tag = pair.split("_")[1]
+    except:
+        print(pair)
+        word_tag_pairs.remove(pair)
+ for word_tag_pair in tqdm(word_tag_pairs):
+        word = word_tag_pair.split("_")[0]
+        tag = word_tag_pair.split("_")[1]
+        if "-" in tag:
+            word_tag_pairs.remove(word_tag_pair)
+            t1 = tag.split("-")[0]
+            t2 = tag.split("-")[0]
+            word_tag_pairs.append(f"{word}_{t1}")
+            word_tag_pairs.append(f"{word}_{t1}")
+print(word_tag_pairs[4])
+print(len(word_tag_pairs))
+all_words = [pair.split('_')[0] for pair in word_tag_pairs]
+all_tags = [pair.split('_')[1] for pair in word_tag_pairs]
+word_freq = Counter(all_words).most_common() 
+tag_freq = Counter(all_tags).most_common() 
+train_words = [word[0] for word in word_freq] 
+tags = [word[0] for word in tag_freq] 
+print(word_tag_pairs[4])
+print(all_words[4])
+print(word_freq[10])
+print(train_words[10])
+print(all_tags[4])
+print(tag_freq[10])
+print(tags[1])
+print(f"No. of unique words in train dataset = {len(train_words)}")
+with open("./train_words.txt", "w+") as f:
+    for word in train_words:
+        f.write(f"{word}\n")
+    f.close()
+tags_to_index = {}
+for index in range(len(tag_freq)):
+    tags_to_index[tag_freq[index][0]] = index
+#print(tags_to_index)
+tags_to_index["start"] = len(tags_to_index) #last tag is start tag
+np.save("tag_to_index.npy", tags_to_index)
+
+index_to_tags = {}
+for index in range(len(tag_freq)):
+    index_to_tags[index] = tag_freq[index][0]
+index_to_tags[len(tags_to_index)] = "start" #last tag is start tag
+np.save("index_to_tag.npy", index_to_tags)
+print(index_to_tags)
+em_prob_of_words_for_each_tag = {}
+for word_tag_pair in tqdm(word_tag_pairs):
+    word = word_tag_pair.split("_")[0]
+    tag = word_tag_pair.split("_")[1]
+    if "-" not in tag:
+        if tag not in em_prob_of_words_for_each_tag:
+            em_prob_of_words_for_each_tag[tag] = {}
+            
+        if word not in em_prob_of_words_for_each_tag[tag]:
+            em_prob_of_words_for_each_tag[tag][word] = 0
+        em_prob_of_words_for_each_tag[tag][word] += 1
+    else:
+        tag1 = tag.split("-")[0]
+        tag2 = tag.split("-")[1]
+        if tag1 not in em_prob_of_words_for_each_tag:
+            em_prob_of_words_for_each_tag[tag1] = {}
+        if tag2 not in em_prob_of_words_for_each_tag:
+            em_prob_of_words_for_each_tag[tag2] = {}
+
+        if word not in em_prob_of_words_for_each_tag.get(tag1):
+            em_prob_of_words_for_each_tag[tag1][word] = 0
+        em_prob_of_words_for_each_tag[tag1][word] += 1
+        if word not in em_prob_of_words_for_each_tag.get(tag2):
+            em_prob_of_words_for_each_tag[tag2][word] = 0
+        em_prob_of_words_for_each_tag[tag2][word] += 1
+
+print(em_prob_of_words_for_each_tag["VVI"]["make"])
+for tag in em_prob_of_words_for_each_tag:
+    total_words_forthis_tag = 0
+    
+    for word in em_prob_of_words_for_each_tag.get(tag):
+        total_words_forthis_tag += 1
+
+    for word in em_prob_of_words_for_each_tag.get(tag):
+        em_prob_of_words_for_each_tag[tag][word]
+
+np.save("word_given_tag.npy", em_prob_of_words_for_each_tag)
+loaded_freq_of_words_for_each_tag = np.load("word_given_tag.npy",allow_pickle=True).item()
+print(f"the tags for be checked: VVI")
+print(loaded_freq_of_words_for_each_tag.get("VVI"))
+transition_matrix = np.zeros([len(tags_to_index),len(tags_to_index)])
+for sentence in sentences:
+    for word_tag_pair_idx in range(len(sentence.split(" "))):
+        word_tag_pair = sentence.split(" ")[word_tag_pair_idx]
+        if len(word_tag_pair.strip()) != 0:
+            try:
+                tag = pair.split("_")[1]
+                if word_tag_pair_idx==0:
+                    prev_tag = "start"
+                else:
+                    prev_tag = sentence.split(" ")[word_tag_pair_idx-1].split("_")[1]
+                curr_tag = word_tag_pair.split("_")[1]
+                transition_matrix[tags_to_index[prev_tag]][tags_to_index[curr_tag]] += 1
+            except:
+                continue
+
+for idx in range(len(tags_to_index)):
+    total = 0
+    for idx2 in range(len(tags_to_index)):
+        total += transition_matrix[idx][idx2]
+    for idx2 in range(len(tags)):
+        transition_matrix[idx][idx2] = transition_matrix[idx][idx2]/total
+np.save("Trans_Matrix.npy",transition_matrix)
+print(transition_matrix[56])
