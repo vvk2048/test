@@ -130,4 +130,4 @@ for idx in range(len(tags_to_index)):
     for idx2 in range(len(tags)):
         transition_matrix[idx][idx2] = transition_matrix[idx][idx2]/total
 np.save("Trans_Matrix.npy",transition_matrix)
-print(transition_matrix[56])
+#print(transition_matrix[56])
